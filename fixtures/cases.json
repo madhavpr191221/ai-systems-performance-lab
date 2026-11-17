@@ -1,0 +1,16 @@
+[
+  {
+    "case_id": "demo-case-01",
+    "annual_revenue": 1000000,
+    "operating_income": 200000,
+    "annual_debt_service": 100000,
+    "complexity": "complex"
+  },
+  {
+    "case_id": "demo-case-02",
+    "annual_revenue": 1800000,
+    "operating_income": 180000,
+    "annual_debt_service": 120000,
+    "complexity": "standard"
+  }
+]

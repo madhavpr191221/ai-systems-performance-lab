@@ -1,0 +1,8 @@
+{
+  "evidence": [
+    {"id": "CASE01-FIN-01", "text": "Synthetic annual revenue is 1,000,000 currency units. Values are illustrative."},
+    {"id": "CASE01-OPS-02", "text": "Synthetic operating income is 200,000 currency units, equivalent to a 20 percent operating margin."},
+    {"id": "CASE01-DEBT-03", "text": "Synthetic annual debt service is 100,000 currency units."},
+    {"id": "CASE01-NOTE-04", "text": "The complex workload profile requests a moderate downside stress before the advisory policy check."}
+  ]
+}

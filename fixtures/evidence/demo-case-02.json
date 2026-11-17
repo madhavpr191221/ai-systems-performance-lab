@@ -1,0 +1,8 @@
+{
+  "evidence": [
+    {"id": "CASE02-FIN-01", "text": "Synthetic annual revenue is 1,800,000 currency units. Values are illustrative."},
+    {"id": "CASE02-OPS-02", "text": "Synthetic operating income is 180,000 currency units, equivalent to a 10 percent operating margin."},
+    {"id": "CASE02-DEBT-03", "text": "Synthetic annual debt service is 120,000 currency units."},
+    {"id": "CASE02-NOTE-04", "text": "The standard workload profile uses a mild downside stress for the illustrative review."}
+  ]
+}

@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Small private data layer for the AI Systems Performance Lab demo.
+
+Parameters:
+  DemoBucketName:
+    Type: String
+    Description: Globally unique S3 bucket name for synthetic demo data and sessions.
+    AllowedPattern: "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+  CasesTableName:
+    Type: String
+    Default: ai-systems-performance-lab-cases
+    Description: DynamoDB table name for synthetic cases.
+
+Resources:
+  CasesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref CasesTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: case_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: case_id
+          KeyType: HASH
+      Tags:
+        - Key: Project
+          Value: ai-systems-performance-lab
+        - Key: Purpose
+          Value: synthetic-agent-demo
+
+  DemoBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Ref DemoBucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Project
+          Value: ai-systems-performance-lab
+        - Key: Purpose
+          Value: synthetic-agent-demo
+
+Outputs:
+  CasesTableName:
+    Description: DynamoDB table containing synthetic case facts.
+    Value: !Ref CasesTable
+  DemoBucketName:
+    Description: Private S3 bucket containing evidence, policy, and sessions.
+    Value: !Ref DemoBucket

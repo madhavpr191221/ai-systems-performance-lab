@@ -1,0 +1,30 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+*.tsbuildinfo
+
+# Virtual environments
+.venv
+node_modules/
+ui/node_modules/
+ui/dist/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+.aws/
+
+# Test and tooling artifacts
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local experiment outputs
+results/local/

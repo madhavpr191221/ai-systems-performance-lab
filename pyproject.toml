@@ -1,0 +1,36 @@
+[project]
+name = "ai-systems-performance-lab"
+version = "0.1.0"
+description = "A reproducible lab for stochastic AI workloads, SLO compliance, queueing, capacity planning, and AWS performance trade-offs."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "bedrock-agentcore>=1.26.0",
+    "boto3>=1.44.3",
+    "botocore[crt]>=1.44.3,<1.45.0",
+    "fastapi>=0.163.1",
+    "httpx>=0.28.1",
+    "numpy>=2.5.5",
+    "pydantic>=2.14.3",
+    "scipy>=1.18.1",
+    "strands-agents>=1.65.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+lab = "ai_systems_performance_lab.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.10.10,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+    "ruff>=0.17.5",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

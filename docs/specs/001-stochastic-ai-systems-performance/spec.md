@@ -17,7 +17,7 @@ System performance is observed using request events, metrics, traces, workload g
 In a short interview walkthrough, a user should be able to:
 
 1. Chat with a real Bedrock-backed agent and see its model/tool activity and evidence in the UI.
-2. Ask follow-up questions in a stable case-scoped session; use fixture playback when AWS is unavailable.
+2. Ask follow-up questions in a stable case-scoped session; use the simulated agent when AWS is unavailable.
 3. After the agent passes its completion gate, apply deterministic, Poisson, bursty, or recorded arrivals to the bounded service.
 4. Observe offered/admitted/rejected/completed work, queue occupancy, concurrency, tool/model latency, failures, and end-to-end latency.
 5. Compare configurations under an equivalent offered workload and explain the stochastic model, measured evidence, sizing decision, and cost trade-offs.
@@ -42,7 +42,7 @@ The demo must work locally with controlled model/tool substitutes and saved resu
 
 The first agent performs an advisory review of synthetic commercial-credit cases. It retrieves case documents and structured values, calls deterministic tools for ratios and stress scenarios, checks a synthetic policy set, and returns an evidence-linked memo for a human. This produces realistic variation in tool count, call order, tool latency, and total service demand. No real borrower data or autonomous credit decisions are in scope.
 
-The agent domain is a workload fixture. The project remains useful if that task is later swapped for another multi-tool agent with comparable request traces and service-demand variation.
+The agent domain is a simulated workload. The project remains useful if that task is later swapped for another multi-tool agent with comparable request traces and service-demand variation.
 
 ### System boundary
 
@@ -55,7 +55,7 @@ The measured path includes ingress, admission, bounded queue, agent orchestratio
 - Kubernetes/EKS, multi-agent frameworks, and durable distributed workflows before requirements justify them.
 - Claims about managed-model internals that cannot be measured.
 - Optimizing agent correctness as the central research question.
-- Treating simulated or fixture results as cloud measurements.
+- Treating simulated results as cloud measurements.
 
 ## 5. Functional requirements
 
@@ -64,7 +64,7 @@ The measured path includes ingress, admission, bounded queue, agent orchestratio
 - FR-01: Implement a bounded multi-step agent using typed tools; the initial task uses synthetic credit cases and read-only evidence/calculation/policy tools.
 - FR-02: Support variable tool-call sequences and case complexity; record each model/tool call and its parent request.
 - FR-03: Keep deterministic calculations in tools and retain basic evaluation for evidence support, calculation correctness, and prohibited outputs.
-- FR-04: Provide a deterministic model/tool fixture path and an interchangeable Amazon Bedrock model adapter.
+- FR-04: Provide a deterministic simulated-agent path and an interchangeable Amazon Bedrock model adapter.
 - FR-05: Enforce per-request deadline, call/retry limits, and explicit outcomes for tool/model timeout, throttling, unavailability, and malformed output.
 
 ### Workload and service
@@ -119,17 +119,17 @@ Agent requests may contain multiple model/tool calls. Preserve request-level tra
 3. Current case facts come from DynamoDB; S3 evidence/policy has source IDs; calculations remain deterministic.
 4. Conversation state is persisted to S3 and optional AgentCore Memory is same-case supplemental context.
 5. Model/tool limits, request timing, failure outcomes, and external service metrics are visible without exposing hidden reasoning.
-6. Mocked tests pass for case isolation, missing sources, partial failures, and tool/model budgets; the fixture path works offline.
+6. Mocked tests pass for case isolation, missing sources, partial failures, and tool/model budgets; the simulated path works offline.
 7. The agent completion gate in `plan.md` passes before stochastic workload experiments begin.
 
 ## 9. Assumptions and open decisions
 
 - The initial agent task is a synthetic multi-tool commercial-credit review, used to create realistic request paths; task-quality evaluation is secondary.
-- Strands Agents owns the model-driven tool loop; the deterministic fixture remains separate for reproducible/high-volume performance experiments. Application admission, request budgets, and telemetry remain outside agent decisions.
-- Deterministic fixtures are the default for repeatable/high-volume runs. Live Bedrock calls are low-volume and require current quota/pricing review and explicit authorization.
+- Strands Agents owns the model-driven tool loop; the deterministic simulated agent remains separate for reproducible/high-volume performance experiments. Application admission, request budgets, and telemetry remain outside agent decisions.
+- The simulated agent is the default for repeatable/high-volume runs. Live Bedrock calls are low-volume and require current quota/pricing review and explicit authorization.
 - Selected AWS path: Bedrock for model calls; DynamoDB for synthetic case facts; S3 for evidence, policy, and session state; optional AgentCore Memory for same-case recall; ECS Fargate for a short private runtime check. CloudWatch/OpenTelemetry instrumentation follows with the performance work.
 - No AWS resources are provisioned by this specification.
-- The demo runs locally and uses the user's AWS profile for low-volume real calls. High-volume load tests use fixtures/replay. The initial Bedrock/Memory integration targets a $5 ceiling; Fargate requires a separate estimate and authorization.
+- The demo runs locally and uses the user's AWS profile for low-volume real calls. High-volume load tests use simulation/replay. The initial Bedrock/Memory integration targets a $5 ceiling; Fargate requires a separate estimate and authorization.
 - Stochastic analysis starts after the agent completion gate, not before it.
 
 ## 10. Principal risks

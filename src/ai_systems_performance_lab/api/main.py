@@ -30,7 +30,7 @@ from ai_systems_performance_lab.agent.aws_tools import (
 from ai_systems_performance_lab.agent.workload import (
     AgentTurn,
     CreditCase,
-    FixtureConversationAgent,
+    SimulatedConversationAgent,
     SyntheticCreditReviewAgent,
     UsageBudgetExceededError,
     load_agent_cases,
@@ -69,7 +69,8 @@ def create_app(
     concurrency: int = 2,
     queue_capacity: int = 4,
     tool_delay_ms: float = 20.0,
-    agent_backend: Literal["fixture", "bedrock"] = "fixture",
+    model_delay_ms: float = 30.0,
+    agent_backend: Literal["simulated", "fixture", "bedrock"] = "simulated",
     bedrock_model_id: str | None = None,
     aws_region: str = "us-east-1",
     case_table: str | None = None,
@@ -77,22 +78,29 @@ def create_app(
     session_bucket: str | None = None,
     memory_id: str | None = None,
 ) -> FastAPI:
-    if agent_backend not in {"fixture", "bedrock"}:
-        raise ValueError("agent_backend must be 'fixture' or 'bedrock'")
+    if agent_backend not in {"simulated", "fixture", "bedrock"}:
+        raise ValueError(
+            "agent_backend must be 'simulated' (legacy 'fixture') or 'bedrock'"
+        )
+    simulated_mode = agent_backend in {"simulated", "fixture"}
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        # The review fixture always remains deterministic and is used only by
+        # The deterministic review workload is used only by
         # the separate workload/queue API; it never calls Bedrock.
         review_service = BoundedReviewService(
-            SyntheticCreditReviewAgent(tool_delay_ms=tool_delay_ms),
+            SyntheticCreditReviewAgent(
+                tool_delay_ms=tool_delay_ms, model_delay_ms=model_delay_ms
+            ),
             concurrency=concurrency,
             queue_capacity=queue_capacity,
         )
         cases = InMemoryCaseRepository(DEFAULT_CASES)
-        if agent_backend == "fixture":
-            conversation_agent = FixtureConversationAgent(
-                DEFAULT_CASES, tool_delay_ms=tool_delay_ms
+        if simulated_mode:
+            conversation_agent = SimulatedConversationAgent(
+                DEFAULT_CASES,
+                tool_delay_ms=tool_delay_ms,
+                model_delay_ms=model_delay_ms,
             )
         else:
             if not bedrock_model_id:
@@ -162,7 +170,7 @@ def create_app(
         await conversation_service.start()
         app.state.review_service = review_service
         app.state.conversation_service = conversation_service
-        app.state.agent_backend = agent_backend
+        app.state.agent_backend = "simulated" if simulated_mode else "bedrock"
         app.state.cases = cases
         app.state.case_options = DEFAULT_CASES
         try:
@@ -174,8 +182,8 @@ def create_app(
     app = FastAPI(title="AI Systems Performance Lab", lifespan=lifespan)
 
     @app.get("/health")
-    async def health() -> dict[str, str]:
-        return {"status": "ok", "inference": agent_backend}
+    async def health(request: Request) -> dict[str, str]:
+        return {"status": "ok", "inference": request.app.state.agent_backend}
 
     @app.get("/metrics")
     async def metrics(request: Request) -> dict:
@@ -186,6 +194,11 @@ def create_app(
     async def agent_metrics(request: Request) -> dict:
         service: BoundedConversationService = request.app.state.conversation_service
         return service.snapshot()
+
+    @app.get("/agent/state")
+    async def agent_state(request: Request) -> dict:
+        service: BoundedConversationService = request.app.state.conversation_service
+        return service.state()
 
     @app.get("/agent/cases")
     async def demo_cases(request: Request) -> list[dict[str, str]]:
@@ -327,7 +340,7 @@ def create_app(
                 await events.put({"type": "result", "data": result})
             except QueueFullError:
                 await events.put({"type": "error", "data": {"reason": "queue_full"}})
-            except Exception:  # noqa: BLE001 - keep fixture endpoint shape stable
+            except Exception:  # noqa: BLE001 - keep the workload endpoint shape stable
                 await events.put({"type": "error", "data": {"reason": "agent_failure"}})
             finally:
                 await events.put(None)
@@ -352,7 +365,11 @@ def create_app(
 
 
 app = create_app(
-    agent_backend=os.getenv("AGENT_BACKEND", "fixture"),  # type: ignore[arg-type]
+    concurrency=int(os.getenv("LAB_CONCURRENCY", "2")),
+    queue_capacity=int(os.getenv("LAB_QUEUE_CAPACITY", "4")),
+    tool_delay_ms=float(os.getenv("LAB_TOOL_DELAY_MS", "20")),
+    model_delay_ms=float(os.getenv("LAB_MODEL_DELAY_MS", "30")),
+    agent_backend=os.getenv("AGENT_BACKEND", "simulated"),  # type: ignore[arg-type]
     bedrock_model_id=os.getenv("BEDROCK_MODEL_ID"),
     aws_region=os.getenv("AWS_REGION", "us-east-1"),
     case_table=os.getenv("DYNAMODB_CASES_TABLE"),

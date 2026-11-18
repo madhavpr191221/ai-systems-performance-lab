@@ -211,6 +211,20 @@ class BoundedConversationService:
             "scope": "process_local",
         }
 
+    def state(self) -> dict[str, int | str]:
+        """Return low-cost instantaneous occupancy without sorting latency samples."""
+        return {
+            "offered": self.counts["offered"],
+            "admitted": self.counts["admitted"],
+            "rejected": self.counts["rejected"],
+            "in_flight": self.reserved + len(self.waiting),
+            "active": self.active,
+            "waiting": len(self.waiting),
+            "concurrency_limit": self.concurrency,
+            "queue_capacity": self.queue_capacity,
+            "scope": "process_local",
+        }
+
 
 def _quantiles(samples: list[float]) -> dict[str, float | None]:
     if not samples:

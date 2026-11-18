@@ -28,3 +28,4 @@ htmlcov/
 
 # Local experiment outputs
 results/local/
+results/aws/

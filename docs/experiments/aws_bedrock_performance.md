@@ -146,6 +146,15 @@ The AWS profile already has access to the Bedrock model and synthetic data. The
 local API uses that profile through the normal AWS SDK credential chain. Keep
 AWS credentials in the AWS CLI profile; do not copy access keys into `.env`.
 
+The Strands Bedrock client uses the streaming `ConverseStream` path. The IAM
+identity therefore needs both `bedrock:InvokeModel` and
+`bedrock:InvokeModelWithResponseStream` on the selected inference profile and
+its allowed foundation-model resources. Having a valid SSO session or seeing
+`bedrock:InvokeModel` in the policy is not enough by itself. If the API log says
+`not authorized to perform: bedrock:InvokeModelWithResponseStream`, add that
+action to the existing model-invocation statement, keeping the same resource
+scope; do not broaden the policy to `Resource: "*"`.
+
 Set these values in the project's `.env` file, replacing the existing
 `AGENT_BACKEND=simulated` line and filling in the shown AWS resource names:
 

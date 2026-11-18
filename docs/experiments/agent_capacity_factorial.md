@@ -143,9 +143,10 @@ the same process, configuration, time window, and system conditions. In the
 high and low settings. The interaction is a difference between those
 differences.
 
-The live runner writes a study folder containing the design, API logs,
-per-setting run records, and an `analysis.json` file. To re-run the analysis
-from the saved run folders:
+The live runner writes a study folder containing the design, an execution
+ledger, API logs, per-setting run records, and an `analysis.json` file. If the
+run is interrupted or a provider call fails, the ledger shows which treatments
+completed and which did not. To re-run the analysis from saved run folders:
 
 ```powershell
 uv run --no-sync python -m ai_systems_performance_lab.experiments.factorial `

@@ -17,6 +17,7 @@ import socket
 import subprocess
 import sys
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -191,7 +192,16 @@ async def execute_study(args: argparse.Namespace) -> Path | None:
     estimate = plan["cost_scenario"]
     print(
         json.dumps(
-            {"study_plan": plan, "warning": "Scenario estimate, not an AWS bill cap."},
+            {
+                "design": plan["design"],
+                "blocks": plan["blocks"],
+                "factors": plan["factors"],
+                "workload": plan["workload"],
+                "planned_turns": plan["planned_turns"],
+                "agent_limits": plan["agent_limits"],
+                "cost_scenario": estimate,
+                "warning": "Scenario estimate, not an AWS bill cap.",
+            },
             indent=2,
         )
     )
@@ -222,17 +232,33 @@ async def execute_study(args: argparse.Namespace) -> Path | None:
     study_dir = run_root / study_id
     study_dir.mkdir(parents=True, exist_ok=False)
     (study_dir / "design.json").write_text(json.dumps(plan, indent=2), encoding="utf-8")
+    ledger_path = study_dir / "execution.json"
+    ledger: dict[str, Any] = {
+        "study_id": study_id,
+        "status": "running",
+        "trials": [{**row, "status": "pending"} for row in plan["schedule"]],
+    }
+
+    def save_ledger() -> None:
+        ledger_path.write_text(json.dumps(ledger, indent=2), encoding="utf-8")
+
+    save_ledger()
     base_url = f"http://{args.api_host}:{args.api_port}"
     profile = args.aws_profile or os.getenv("AWS_PROFILE")
     region = args.aws_region or os.getenv("AWS_REGION", "us-east-1")
     completed: list[str] = []
 
     try:
-        for row in plan["schedule"]:
+        for row_index, row in enumerate(plan["schedule"]):
+            trial = ledger["trials"][row_index]
             row_id = (
                 f"b{row['block']:02d}-o{row['order_in_block']}-"
                 f"c{row['concurrency']}-k{row['queue_capacity']}"
             )
+            trial["run_id"] = f"{study_id}-{row_id}"
+            trial["started_utc"] = datetime.now(UTC).isoformat()
+            trial["status"] = "running"
+            save_ledger()
             env = os.environ.copy()
             env.update(
                 {
@@ -287,13 +313,32 @@ async def execute_study(args: argparse.Namespace) -> Path | None:
                     )
                     result_dir = await run_workload(workload_args)
                     completed.append(str(result_dir))
+                    trial["status"] = "completed"
+                    trial["run_dir"] = str(result_dir)
+                    trial["completed_utc"] = datetime.now(UTC).isoformat()
+                    save_ledger()
                     print(f"Completed {row_id}: {result_dir}", flush=True)
+                except BaseException as exc:
+                    trial["status"] = (
+                        "interrupted"
+                        if isinstance(exc, KeyboardInterrupt)
+                        else "failed"
+                    )
+                    trial["error_type"] = type(exc).__name__
+                    trial["completed_utc"] = datetime.now(UTC).isoformat()
+                    save_ledger()
+                    raise
                 finally:
                     _stop_api(process)
     finally:
-        (study_dir / "completed_runs.json").write_text(
-            json.dumps(completed, indent=2), encoding="utf-8"
+        ledger["status"] = (
+            "complete"
+            if all(trial["status"] == "completed" for trial in ledger["trials"])
+            else "incomplete"
         )
+        ledger["completed_runs"] = completed
+        ledger["updated_utc"] = datetime.now(UTC).isoformat()
+        save_ledger()
     analysis_rows = []
     for run_dir in completed:
         run_path = Path(run_dir)
@@ -358,6 +403,10 @@ def main() -> None:
         parser.error("API host and port are invalid")
     try:
         asyncio.run(execute_study(args))
+    except KeyboardInterrupt:
+        print(
+            "Study interrupted. See execution.json for completed and in-progress trials."
+        )
     except (ValueError, RuntimeError, httpx.HTTPError) as exc:
         parser.error(str(exc))
 

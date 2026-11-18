@@ -480,6 +480,12 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 async def run(args: argparse.Namespace) -> Path | None:
     base_url = args.base_url.rstrip("/")
+    block_id = getattr(args, "block_id", None)
+    order_in_block = getattr(args, "order_in_block", None)
+    if block_id is not None and block_id < 1:
+        raise ValueError("--block-id must be positive")
+    if order_in_block is not None and order_in_block < 1:
+        raise ValueError("--order-in-block must be positive")
     if args.hosting == "local" and urlsplit(base_url).hostname not in {
         "localhost",
         "127.0.0.1",
@@ -606,6 +612,7 @@ async def run(args: argparse.Namespace) -> Path | None:
                     "arrival": arrival,
                     "rate_per_s": rate,
                     "repetition": repetition,
+                    "block_id": block_id or repetition,
                     "condition_order": condition_order,
                     **summarize_repetition(observed, deadline_s=args.deadline_s),
                 }
@@ -629,6 +636,8 @@ async def run(args: argparse.Namespace) -> Path | None:
         "aws_calls": True,
         "bedrock_calls": True,
         "experiment_id": run_id,
+        "block_id": block_id,
+        "order_in_block": order_in_block,
         "target_host": base_url.split("/")[2],
         "model_id": args.model_id,
         "agent_service_configuration": {
@@ -772,6 +781,16 @@ def main() -> None:
         help="Where the API runs; local excludes Fargate and public IPv4 charges",
     )
     parser.add_argument("--experiment-id")
+    parser.add_argument(
+        "--block-id",
+        type=int,
+        help="Matched factorial block number; used to combine one-repetition treatment runs",
+    )
+    parser.add_argument(
+        "--order-in-block",
+        type=int,
+        help="Treatment position from the randomized factorial design file",
+    )
     parser.add_argument(
         "--arrivals",
         nargs="+",

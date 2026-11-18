@@ -41,6 +41,18 @@ for the local pilot instructions, workload design, cost estimate, result
 format, and later Fargate deployment steps. The Fargate study is separately
 gated; its resources have not been provisioned.
 
+The next implemented experiment is a randomized, blocked 2×2 study of API
+concurrency and waiting-queue capacity in front of the real Bedrock-backed
+agent. The API runs locally; Bedrock, DynamoDB, S3, and CloudWatch are real AWS
+services. Its design and run-level analysis are documented in
+[agent capacity factorial study](docs/experiments/agent_capacity_factorial.md).
+Preview or run the whole study with
+`uv run --env-file .env --no-sync python -m ai_systems_performance_lab.experiments.factorial_live`.
+Without `--execute`, it only prints the workload and total token-cost scenario.
+The design is prepared, but no factorial study or OpenAI answer judge has been
+run. A later Fargate study will add real AWS API compute and infrastructure
+measurements once the deployment prerequisites are ready.
+
 It also supports a bounded local SLO sizing sweep over concurrency and queue
 capacity. The report separates on-time goodput, rejection, and admitted
 technical failures, and classifies candidates only when repetition-level

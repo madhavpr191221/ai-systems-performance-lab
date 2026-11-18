@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
         "/metrics": apiTarget,
         "/review": apiTarget,
         "/agent": apiTarget,
+        "/experiments": apiTarget,
       },
     },
   };

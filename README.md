@@ -24,12 +24,14 @@ quality claim. The stochastic performance experiments begin after the live
 agent interaction has passed its acceptance gate. The separate `/review`
 endpoint remains a deterministic simulated workload for later load tests.
 
-The first agent workload experiment is implemented on a separate experiment
-branch. It uses HTTP open-loop arrivals against the local simulated agent to
-compare arrival variability, finite queue sizes, and concurrency. It forces the
-simulated backend and makes no AWS or Bedrock calls. See
-[the experiment protocol](docs/experiments/local_open_loop.md) for methodology,
-run commands, artifact definitions, and limitations.
+The performance lab now includes a browser dashboard for saved HTTP workload
+runs and bounded, paired local comparisons. It changes one factor at a time
+(arrival process, offered rate, concurrency, or queue capacity), reuses matched
+seeds across each baseline/candidate pair, and records request-level outcomes
+and sampled occupancy. These are local measurements against the simulated
+agent. The dashboard makes no AWS or Bedrock calls. See the
+[experiment protocol](docs/experiments/local_open_loop.md) and
+[dashboard design and limits](docs/experiments/dashboard.md).
 
 ## Run the local interactive demo
 
@@ -49,6 +51,11 @@ Edit `.env` to change host/port values. The launcher reports occupied ports
 without terminating unrelated processes. `AGENT_BACKEND=simulated` in `.env`
 selects a local demo that makes no cloud calls. The older value `fixture` is
 still accepted for compatibility.
+
+Open **Performance lab** in the left navigation to inspect or run local
+comparisons. The UI caps each run to 10 repetitions, 30 seconds per condition,
+and 10 minutes total offered experiment time. A running experiment uses one
+local process at a time and can be cancelled from the page.
 
 ## Use the Bedrock agent
 

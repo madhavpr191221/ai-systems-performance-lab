@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import Markdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
+import Experiments from "./Experiments";
 
 type Backend = "simulated" | "bedrock" | "offline";
 type Metrics = {
@@ -68,6 +69,7 @@ function titleForEvent(event: Record<string, unknown>): Activity {
 }
 
 export default function App() {
+  const [screen, setScreen] = useState<"agent" | "experiments">("agent");
   const [backend, setBackend] = useState<Backend>("offline");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activity, setActivity] = useState<Activity[]>([]);
@@ -246,6 +248,8 @@ export default function App() {
 
   const backendLabel = backend === "bedrock" ? "Bedrock · configured" : backend === "simulated" ? "Simulated agent · no LLM" : "API offline";
 
+  if (screen === "experiments") return <Experiments onBack={() => setScreen("agent")} />;
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -258,7 +262,8 @@ export default function App() {
       <section className="workspace" id="top">
         <aside className="left-rail">
           <div className="rail-heading">WORKSPACE</div>
-          <button className="nav-item selected"><span>◉</span> Case analyst</button>
+          <button className="nav-item selected" onClick={() => setScreen("agent")}><span>◉</span> Case analyst</button>
+          <button className="nav-item" onClick={() => setScreen("experiments")}><span>⌁</span> Performance lab</button>
           <div className="rail-card"><div className="rail-card-top"><span className="tiny-dot" /> CONVERSATION</div><strong>Evidence review</strong><p>Ask follow-up questions and watch the agent choose its tools.</p></div>
           <div className="rail-note"><span className="note-icon">↗</span><div><strong>Systems lab</strong><p>Service metrics are measured outside the agent's decision loop.</p></div></div>
           <div className="rail-footer">SYNTHETIC DATA · NO CREDIT DECISIONS</div>

@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
@@ -35,6 +36,8 @@ from ai_systems_performance_lab.agent.workload import (
     UsageBudgetExceededError,
     load_agent_cases,
 )
+from ai_systems_performance_lab.experiments.routes import router as experiments_router
+from ai_systems_performance_lab.experiments.service import LocalExperimentManager
 
 DEFAULT_CASES = load_agent_cases(
     generated_count=int(os.getenv("SYNTHETIC_CASE_COUNT", "1000")),
@@ -77,6 +80,7 @@ def create_app(
     data_bucket: str | None = None,
     session_bucket: str | None = None,
     memory_id: str | None = None,
+    experiment_root: Path | None = None,
 ) -> FastAPI:
     if agent_backend not in {"simulated", "fixture", "bedrock"}:
         raise ValueError(
@@ -86,6 +90,9 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        app.state.experiment_manager = LocalExperimentManager(
+            experiment_root or Path(__file__).resolve().parents[3] / "results"
+        )
         # The deterministic review workload is used only by
         # the separate workload/queue API; it never calls Bedrock.
         review_service = BoundedReviewService(
@@ -176,10 +183,12 @@ def create_app(
         try:
             yield
         finally:
+            await app.state.experiment_manager.close()
             await conversation_service.stop()
             await review_service.stop()
 
     app = FastAPI(title="AI Systems Performance Lab", lifespan=lifespan)
+    app.include_router(experiments_router)
 
     @app.get("/health")
     async def health(request: Request) -> dict[str, str]:

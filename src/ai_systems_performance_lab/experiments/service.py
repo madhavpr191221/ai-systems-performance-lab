@@ -11,6 +11,8 @@ from ai_systems_performance_lab.experiments.interactive import (
     ComparisonRequest,
     run_comparison,
 )
+from ai_systems_performance_lab.experiments.sizing import run_sizing_study
+from ai_systems_performance_lab.experiments.slo import SizingStudyRequest
 
 
 class LocalExperimentManager:
@@ -58,6 +60,43 @@ class LocalExperimentManager:
                     self.job.update(status="failed", error=type(exc).__name__, current=None)
 
         self._task = asyncio.create_task(execute(), name=f"local-experiment-{job_id}")
+        return self.snapshot() or {}
+
+    def start_sizing(self, request: SizingStudyRequest) -> dict[str, Any]:
+        if self._task is not None and not self._task.done():
+            raise RuntimeError("an experiment is already running")
+        job_id = uuid.uuid4().hex
+        self._cancelled = asyncio.Event()
+        total = len(request.concurrency_candidates) * len(request.queue_candidates) * request.repetitions
+        self.job = {
+            "job_id": job_id,
+            "kind": "slo_sizing",
+            "status": "running",
+            "completed_runs": 0,
+            "total_runs": total,
+            "current": None,
+            "run_id": None,
+            "error": None,
+            "request": request.model_dump(),
+        }
+
+        def progress(update: dict[str, Any]) -> None:
+            if self.job and self.job["job_id"] == job_id:
+                self.job.update(update)
+
+        async def execute() -> None:
+            try:
+                path = await run_sizing_study(request, self.output_root, progress, self._cancelled)
+                if self.job and self.job["job_id"] == job_id:
+                    self.job.update(status="completed", run_id=path.name, current=None)
+            except asyncio.CancelledError:
+                if self.job and self.job["job_id"] == job_id:
+                    self.job.update(status="cancelled", current=None)
+            except Exception as exc:  # noqa: BLE001 - keep UI error detail safe
+                if self.job and self.job["job_id"] == job_id:
+                    self.job.update(status="failed", error=type(exc).__name__, current=None)
+
+        self._task = asyncio.create_task(execute(), name=f"slo-sizing-{job_id}")
         return self.snapshot() or {}
 
     async def cancel(self) -> dict[str, Any] | None:

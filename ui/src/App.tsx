@@ -69,6 +69,9 @@ function titleForEvent(event: Record<string, unknown>): Activity {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    document.documentElement.dataset.theme === "dark" ? "dark" : "light",
+  );
   const [screen, setScreen] = useState<"agent" | "experiments">("agent");
   const [backend, setBackend] = useState<Backend>("offline");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -82,6 +85,17 @@ export default function App() {
   const [error, setError] = useState("");
   const [startingSession, setStartingSession] = useState(false);
   const activityEnd = useRef<HTMLDivElement>(null);
+
+  function toggleTheme() {
+    const next = theme === "light" ? "dark" : "light";
+    document.documentElement.dataset.theme = next;
+    try {
+      window.localStorage.setItem("ai-systems-performance-lab-theme", next);
+    } catch {
+      // Keep the selection for this session if browser storage is unavailable.
+    }
+    setTheme(next);
+  }
 
   const refreshSystem = async () => {
     try {
@@ -248,7 +262,7 @@ export default function App() {
 
   const backendLabel = backend === "bedrock" ? "Bedrock · configured" : backend === "simulated" ? "Simulated agent · no LLM" : "API offline";
 
-  if (screen === "experiments") return <Experiments onBack={() => setScreen("agent")} />;
+  if (screen === "experiments") return <Experiments onBack={() => setScreen("agent")} theme={theme} onToggleTheme={toggleTheme} />;
 
   return (
     <main className="app-shell">
@@ -256,7 +270,7 @@ export default function App() {
         <a className="brand" href="#top" aria-label="AI Systems Performance Lab home">
           <span className="brand-mark">A</span><span><strong>AI Systems</strong><small>PERFORMANCE LAB</small></span>
         </a>
-        <div className="topbar-right"><span className={`backend-pill ${backend}`}><i />{backendLabel}</span><span className="region-label">INTERACTIVE AGENT</span></div>
+        <div className="topbar-right"><span className={`backend-pill ${backend}`}><i />{backendLabel}</span><button className="theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === "dark"} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}>{theme === "light" ? "Dark" : "Light"}</button><span className="region-label">INTERACTIVE AGENT</span></div>
       </header>
 
       <section className="workspace" id="top">

@@ -27,13 +27,13 @@ class ComparisonRequest(BaseModel):
     baseline_value: str | float | int = 0
     candidate_value: str | float | int = 16
     arrival: Literal["deterministic", "poisson"] = "poisson"
-    rate_rps: float = Field(default=20, ge=0.1, le=50)
+    rate_rps: int = Field(default=20, ge=1, le=50)
     concurrency: int = Field(default=2, ge=1, le=16)
     queue_capacity: int = Field(default=4, ge=0, le=128)
     duration_s: int = Field(default=5, ge=1, le=30)
     repetitions: int = Field(default=10, ge=1, le=10)
     seed: int = Field(default=20261118, ge=0, le=2_147_483_647)
-    deadline_ms: float = Field(default=500, ge=10, le=30_000)
+    deadline_ms: float = Field(default=500, gt=0, allow_inf_nan=False)
     tool_delay_ms: float = Field(default=20, ge=0, le=500)
     model_delay_ms: float = Field(default=30, ge=0, le=500)
 
@@ -48,20 +48,12 @@ class ComparisonRequest(BaseModel):
             if self.baseline_value not in allowed or self.candidate_value not in allowed:
                 raise ValueError("arrival comparison values must be deterministic or poisson")
         elif self.factor == "rate":
-            self._numeric_values(0.1, 50)
+            self._integer_values(1, 50)
         elif self.factor == "concurrency":
             self._integer_values(1, 16)
         else:
             self._integer_values(0, 128)
         return self
-
-    def _numeric_values(self, lower: float, upper: float) -> None:
-        try:
-            values = (float(self.baseline_value), float(self.candidate_value))
-        except (TypeError, ValueError) as exc:
-            raise ValueError("comparison values must be numeric") from exc
-        if any(value < lower or value > upper for value in values):
-            raise ValueError(f"comparison values must be between {lower} and {upper}")
 
     def _integer_values(self, lower: int, upper: int) -> None:
         values = (self.baseline_value, self.candidate_value)

@@ -33,6 +33,16 @@ agent. The dashboard makes no AWS or Bedrock calls. See the
 [experiment protocol](docs/experiments/local_open_loop.md) and
 [dashboard design and limits](docs/experiments/dashboard.md).
 
+It also supports a bounded local SLO sizing sweep over concurrency and queue
+capacity. The report separates on-time goodput, rejection, and admitted
+technical failures, and classifies candidates only when repetition-level
+uncertainty can be estimated. An optional OpenAI architecture reviewer can be
+invoked manually from a saved SLO study; that call is outside the measured
+workload and may incur provider charges. Set `OPENAI_API_KEY` and optionally
+`OPENAI_REVIEW_MODEL` in the untracked `.env` file to enable it. The reviewer
+does not run at app startup or during experiments. Local sizing is not AWS
+capacity or cost evidence.
+
 ## Run the local interactive demo
 
 From the project root, start both the API and browser UI with one command:

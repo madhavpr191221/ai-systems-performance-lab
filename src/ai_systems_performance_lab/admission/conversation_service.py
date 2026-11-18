@@ -217,6 +217,7 @@ class BoundedConversationService:
             "offered": self.counts["offered"],
             "admitted": self.counts["admitted"],
             "rejected": self.counts["rejected"],
+            "completed": self.counts["completed"],
             "in_flight": self.reserved + len(self.waiting),
             "active": self.active,
             "waiting": len(self.waiting),

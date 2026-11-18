@@ -20,16 +20,36 @@ performance benchmark. The UI distinguishes account, IAM, and provider errors.
 
 The UI's case picker contains the two hand-written examples plus a reproducible
 set of 1,000 generated examples. Generated inputs are test data, not a model
-quality claim. The stochastic performance experiments begin after the live
-agent interaction has passed its acceptance gate. The separate `/review`
-endpoint remains a deterministic simulated workload for later load tests.
+quality claim. The separate `/review` endpoint remains a deterministic
+simulated workload. The bounded open-loop workload runner supports a local API
+using real Bedrock inference and AWS data, as well as a later Fargate-hosted
+API. It records request-level results, previews token costs, and collects
+CloudWatch Bedrock metrics when permitted. The Fargate/ECR templates have not
+been deployed; the local Bedrock performance study has not yet been run.
 
-The first agent workload experiment is implemented on a separate experiment
-branch. It uses HTTP open-loop arrivals against the local simulated agent to
-compare arrival variability, finite queue sizes, and concurrency. It forces the
-simulated backend and makes no AWS or Bedrock calls. See
-[the experiment protocol](docs/experiments/local_open_loop.md) for methodology,
-run commands, artifact definitions, and limitations.
+The performance lab now includes a browser dashboard for saved HTTP workload
+runs and bounded, paired local comparisons. It changes one factor at a time
+(arrival process, offered rate, concurrency, or queue capacity), reuses matched
+seeds across each baseline/candidate pair, and records request-level outcomes
+and sampled occupancy. These are local measurements against the simulated
+agent. The dashboard makes no AWS or Bedrock calls. See the
+[experiment protocol](docs/experiments/local_open_loop.md) and
+[dashboard design and limits](docs/experiments/dashboard.md).
+
+See the [real Bedrock performance study](docs/experiments/aws_bedrock_performance.md)
+for the local pilot instructions, workload design, cost estimate, result
+format, and later Fargate deployment steps. The Fargate study is separately
+gated; its resources have not been provisioned.
+
+It also supports a bounded local SLO sizing sweep over concurrency and queue
+capacity. The report separates on-time goodput, rejection, and admitted
+technical failures, and classifies candidates only when repetition-level
+uncertainty can be estimated. An optional OpenAI architecture reviewer can be
+invoked manually from a saved SLO study; that call is outside the measured
+workload and may incur provider charges. Set `OPENAI_API_KEY` and optionally
+`OPENAI_REVIEW_MODEL` in the untracked `.env` file to enable it. The reviewer
+does not run at app startup or during experiments. Local sizing is not AWS
+capacity or cost evidence.
 
 ## Run the local interactive demo
 
@@ -49,6 +69,11 @@ Edit `.env` to change host/port values. The launcher reports occupied ports
 without terminating unrelated processes. `AGENT_BACKEND=simulated` in `.env`
 selects a local demo that makes no cloud calls. The older value `fixture` is
 still accepted for compatibility.
+
+Open **Performance lab** in the left navigation to inspect or run local
+comparisons. The UI caps each run to 10 repetitions, 30 seconds per condition,
+and 10 minutes total offered experiment time. A running experiment uses one
+local process at a time and can be cancelled from the page.
 
 ## Use the Bedrock agent
 
@@ -88,8 +113,10 @@ uv run python scripts/seed_aws_demo.py --profile ai-systems-performance-lab `
 Review the CloudFormation change set before creating resources. The data layer
 is already created in the original demo account. The local request, model-call,
 tool-call, and token limits can be lowered for a live pilot. These controls
-reduce accidental usage but are not a hard AWS spending cap. No Fargate
-deployment or AgentCore Memory resource is included in this first step.
+reduce accidental usage but are not a hard AWS spending cap. The Fargate
+deployment is defined by separate templates and remains gated by cost review,
+account permissions, and explicit approval. AgentCore Memory is not required
+for the performance study.
 
 ## Agent boundaries
 
@@ -120,6 +147,6 @@ uv run --env-file .env lab
 The combined command is the local run path; the launcher manages Node/Vite, so
 you do not need to run npm manually.
 
-Simulated runs and recorded results are the repeatable/high-volume path. Real
-Bedrock requests remain small, cost-bounded integration checks and must never
-be used as uncontrolled load generation.
+Simulated runs are the repeatable, high-volume development path. The AWS runner
+is deliberately bounded and open-loop; review its cost scenario, request cap,
+token assumptions, and stop/teardown procedure before using it.

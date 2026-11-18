@@ -64,14 +64,15 @@ This is the current interview-demo arrangement: the UI and API run locally;
 the API uses the AWS SDK credential chain to call AWS services. The waiting line
 and metrics live inside that one API process, so multiple copies would each
 have their own limits and measurements. In simulated mode, no model is called.
-When hosted later, the API can move into an ECS Fargate task; that deployment
-is not yet provisioned. CloudWatch applies to that hosted task. The hosted
-network path (for example, private ECS tasks and authenticated ingress) is a
-later design; it is not drawn as if it already exists.
+An earlier low-volume Bedrock turn succeeded, but that is not a performance
+measurement. One-task ECS Fargate templates and a bounded live workload runner
+are now available; no compute has been provisioned. The planned temporary path
+uses a public task IP restricted by security group to one client IPv4 `/32`,
+with no load balancer or application authentication. It is only for synthetic
+data and must be removed after the experiment.
 
 ### Model and tool interaction
 
-**The model is configurable and has not been selected for a live run yet.**
 The local default is a scripted simulation, not an LLM. Bedrock mode requires
 `BEDROCK_MODEL_ID`. Amazon Nova 2 Lite is the candidate for the first low-volume
 tool-use trial; its [model card lists client-side tool calling and response
@@ -222,22 +223,26 @@ policy before a persistent public deployment.
 | `simulated` (default; legacy `fixture` accepted) | Scripted no-LLM response | Seeded in-memory cases; deterministic delays | `simulated_agent_no_llm` |
 | `bedrock` | Strands model-driven loop on Bedrock | DynamoDB, S3, S3 session history, optional AgentCore Memory | `strands_bedrock:<model-id>` |
 
-The simulated agent is the standard load-test path. Do not use uncontrolled real Bedrock
-calls as a load generator. Preserve source labels for simulated, recorded, local
-live AWS, and deployed AWS evidence.
+The simulated agent remains the repeatable high-volume path. The new AWS runner
+provides a separate bounded open-loop workload against the deployed Bedrock
+agent; use it only after reviewing its cost scenario and obtaining approval.
+Preserve source labels for simulated, recorded, local live AWS, and deployed
+AWS evidence.
 
 ## AWS target and cost boundary
 
-The interview demo runs on the user's laptop and uses the configured AWS
-profile to make low-volume Bedrock and AWS data calls. A Docker image supports a
-short-lived ECS Fargate smoke deployment with no public ingress; no resource is
-provisioned by the code changes. The model, table, bucket, and AgentCore Memory
-resource must be available in the selected region first.
+The UI and load generator run on the user's laptop. The Fargate task uses its
+task role for Bedrock and synthetic data calls; local AWS credentials are not
+copied into the container. The ECR/Fargate templates and runner are implemented
+but have not been deployed. The model, table, and bucket must exist in the
+selected region first; AgentCore Memory is optional and excluded from the first
+performance study.
 
-Before the first live integration, estimate the chosen model's token usage,
-AgentCore Memory usage, and S3/DynamoDB requests against the agreed $5 ceiling.
-Fargate is a separate cost estimate and deployment authorization. No public,
-always-on endpoint or high-volume paid inference test is part of this stage.
+Before deployment or a paid performance run, estimate the Bedrock token scenario,
+Fargate runtime, public IPv4, logs, and data transfer, then obtain separate
+approval. The estimate is not a hard AWS billing cap. See the [real Bedrock
+performance study](experiments/aws_bedrock_performance.md) for workload bounds,
+IAM prerequisites, commands, and teardown.
 
 ## Current limitations
 

@@ -165,3 +165,17 @@ aws cloudformation wait stack-delete-complete --stack-name $stack --profile $pro
 Confirm that the CloudFormation stack, DynamoDB table, and S3 bucket no longer
 exist. Check the Billing console again later because cost and usage reporting can
 be delayed. Do not delete unrelated buckets or tables.
+
+## Later: real Bedrock performance study
+
+The ECR repository and one-task Fargate service are defined separately in
+`agent-ecr.yaml` and `agent-fargate.yaml`. They are not part of the data-layer
+stack above, and have not been deployed. The deployment has a temporary public
+task IP restricted to one client IPv4 CIDR, no application authentication, and
+no load balancer. Use synthetic cases only, review the task's IAM policy, and
+delete the resources after the study.
+
+Read [`docs/experiments/aws_bedrock_performance.md`](../../docs/experiments/aws_bedrock_performance.md)
+for the workload, default cost scenario, permission requirements, run command,
+and teardown process. That runbook is the required cost-review gate. Do not
+launch resources or paid inference until its estimate is reviewed and approved.

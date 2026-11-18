@@ -130,6 +130,8 @@ class BoundedConversationService:
                     "execution_source": result.execution_source,
                     "model_calls": result.model_calls,
                     "tool_calls": result.tool_calls,
+                    "input_tokens": result.input_tokens,
+                    "output_tokens": result.output_tokens,
                     "tool_events": [
                         {
                             "name": event.name,
@@ -217,6 +219,7 @@ class BoundedConversationService:
             "offered": self.counts["offered"],
             "admitted": self.counts["admitted"],
             "rejected": self.counts["rejected"],
+            "completed": self.counts["completed"],
             "in_flight": self.reserved + len(self.waiting),
             "active": self.active,
             "waiting": len(self.waiting),

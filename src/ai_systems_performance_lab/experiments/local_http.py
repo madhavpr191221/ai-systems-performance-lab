@@ -214,6 +214,7 @@ async def _turn(
         0,
         0,
     )
+    admitted = False
     try:
         async with client.stream(
             "POST",
@@ -230,7 +231,9 @@ async def _turn(
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
                         event = json.loads(line[6:])
-                        if event.get("type") == "result":
+                        if event.get("type") == "admitted":
+                            admitted = True
+                        elif event.get("type") == "result":
                             outcome = "success"
                             service_ms = (
                                 event["data"].get("timing_ms", {}).get("processing")
@@ -258,6 +261,7 @@ async def _turn(
         "dispatch_offset_s": dispatch - origin,
         "scheduler_lag_ms": max(0.0, (dispatch - scheduled) * 1000),
         "outcome": outcome,
+        "admitted": admitted or outcome == "success",
         "reason": body,
         "completed_offset_s": completed - origin,
         "end_to_end_ms": end_to_end_ms,
@@ -339,7 +343,7 @@ async def _run_once(
             while not stop.is_set():
                 try:
                     state = (await client.get("/agent/state", timeout=2)).json()
-                    for key in ("offered", "admitted", "rejected"):
+                    for key in ("offered", "admitted", "rejected", "completed"):
                         state[key] -= state_before[key]
                     occupancy.append({"offset_s": time.perf_counter() - t0, **state})
                 except httpx.HTTPError:
@@ -392,6 +396,7 @@ async def _run_once(
                                 if dispatched is not None
                                 else None,
                                 "outcome": "unfinished",
+                                "admitted": False,
                                 "reason": "drain_limit",
                                 "completed_offset_s": None,
                                 "end_to_end_ms": (time.perf_counter() - (t0 + offset))
@@ -405,6 +410,10 @@ async def _run_once(
                         )
         stop.set()
         await poller
+        final_state = (await client.get("/agent/state")).json()
+        for key in ("offered", "admitted", "rejected", "completed"):
+            final_state[key] -= state_before[key]
+        occupancy.append({"offset_s": time.perf_counter() - t0, **final_state})
         metrics = (await client.get("/agent/metrics")).json()
         for key in (
             "offered",
@@ -464,6 +473,7 @@ def _summarize(
         "concurrency": condition.concurrency,
         "queue_capacity": condition.queue_capacity,
         "offered": len(rows),
+        "admitted": int(server.get("admitted", sum(bool(row.get("admitted")) for row in rows))),
         "dispatched": sum(row["dispatch_offset_s"] is not None for row in rows),
         "not_dispatched": sum(row["dispatch_offset_s"] is None for row in rows),
         **counts,
@@ -484,6 +494,11 @@ def _summarize(
         / len(rows)
         if rows
         else 0,
+        "success_within_deadline": sum(bool(row["within_deadline"]) for row in rows),
+        "admitted_failure_fraction": sum(
+            bool(row.get("admitted")) and row["outcome"] in {"failed", "timed_out"}
+            for row in rows
+        ) / max(1, int(server.get("admitted", sum(bool(row.get("admitted")) for row in rows)))),
         "successful_end_to_end_ms": {
             f"p{p}": percentile(latencies, p) for p in (50, 95, 99)
         },

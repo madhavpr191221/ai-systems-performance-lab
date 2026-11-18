@@ -46,6 +46,8 @@ class AgentAnswer:
     execution_source: str
     model_calls: int
     tool_calls: int
+    input_tokens: int | None = None
+    output_tokens: int | None = None
 
 
 @dataclass(frozen=True)

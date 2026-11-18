@@ -224,6 +224,8 @@ async def test_strands_agent_selects_tools_and_reuses_s3_session(monkeypatch) ->
     assert result.answer.startswith("The DSCR is 2.0")
     assert result.tool_calls == 1
     assert result.model_calls == 1
+    assert result.input_tokens == 10
+    assert result.output_tokens == 8
     assert [tool.__name__ for tool in selected_tools] == [
         "get_case_facts",
         "calculate_dscr",

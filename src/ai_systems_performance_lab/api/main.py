@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
+from time import perf_counter
 from typing import Literal
 from uuid import uuid4
 
@@ -35,6 +38,10 @@ from ai_systems_performance_lab.agent.workload import (
     UsageBudgetExceededError,
     load_agent_cases,
 )
+from ai_systems_performance_lab.experiments.routes import router as experiments_router
+from ai_systems_performance_lab.experiments.service import LocalExperimentManager
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_CASES = load_agent_cases(
     generated_count=int(os.getenv("SYNTHETIC_CASE_COUNT", "1000")),
@@ -77,6 +84,7 @@ def create_app(
     data_bucket: str | None = None,
     session_bucket: str | None = None,
     memory_id: str | None = None,
+    experiment_root: Path | None = None,
 ) -> FastAPI:
     if agent_backend not in {"simulated", "fixture", "bedrock"}:
         raise ValueError(
@@ -86,6 +94,9 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        app.state.experiment_manager = LocalExperimentManager(
+            experiment_root or Path(__file__).resolve().parents[3] / "results"
+        )
         # The deterministic review workload is used only by
         # the separate workload/queue API; it never calls Bedrock.
         review_service = BoundedReviewService(
@@ -171,19 +182,26 @@ def create_app(
         app.state.review_service = review_service
         app.state.conversation_service = conversation_service
         app.state.agent_backend = "simulated" if simulated_mode else "bedrock"
+        app.state.bedrock_model_id = bedrock_model_id if not simulated_mode else None
         app.state.cases = cases
         app.state.case_options = DEFAULT_CASES
         try:
             yield
         finally:
+            await app.state.experiment_manager.close()
             await conversation_service.stop()
             await review_service.stop()
 
     app = FastAPI(title="AI Systems Performance Lab", lifespan=lifespan)
+    app.include_router(experiments_router)
 
     @app.get("/health")
-    async def health(request: Request) -> dict[str, str]:
-        return {"status": "ok", "inference": request.app.state.agent_backend}
+    async def health(request: Request) -> dict[str, str | None]:
+        return {
+            "status": "ok",
+            "inference": request.app.state.agent_backend,
+            "model_id": request.app.state.bedrock_model_id,
+        }
 
     @app.get("/metrics")
     async def metrics(request: Request) -> dict:
@@ -249,31 +267,83 @@ def create_app(
         )
         events: asyncio.Queue[dict | None] = asyncio.Queue()
         loop = asyncio.get_running_loop()
+        request_started = perf_counter()
+        request_context: dict[str, object] = {"admitted": False, "request_id": None}
+
+        def log_outcome(outcome: str, reason: str) -> None:
+            logger.info(
+                json.dumps(
+                    {
+                        "event": "agent_turn_completed",
+                        "experiment_id": request.headers.get("x-experiment-id"),
+                        "case_id": payload.case_id,
+                        "request_id": request_context["request_id"],
+                        "admitted": request_context["admitted"],
+                        "request_duration_ms": (perf_counter() - request_started)
+                        * 1000,
+                        "outcome": outcome,
+                        "reason": reason,
+                    },
+                    separators=(",", ":"),
+                )
+            )
 
         def publish(event: dict[str, str]) -> None:
+            if event.get("type") == "admitted":
+                request_context["admitted"] = True
+            if event.get("request_id"):
+                request_context["request_id"] = event["request_id"]
             if not loop.is_closed():
                 loop.call_soon_threadsafe(events.put_nowait, event)
 
         async def execute() -> None:
             try:
                 response = await service.submit(turn, progress=publish)
+                # Structured, prompt-free record for CloudWatch Logs and later
+                # experiment correlation. Request IDs are log fields, never metric dimensions.
+                logger.info(
+                    json.dumps(
+                        {
+                            "event": "agent_turn_completed",
+                            "experiment_id": request.headers.get("x-experiment-id"),
+                            "request_id": response["request_id"],
+                            "case_id": payload.case_id,
+                            "outcome": "success",
+                            "model_calls": response["model_calls"],
+                            "tool_calls": response["tool_calls"],
+                            "input_tokens": response.get("input_tokens"),
+                            "output_tokens": response.get("output_tokens"),
+                            **{
+                                f"{name}_ms": value
+                                for name, value in response["timing_ms"].items()
+                            },
+                        },
+                        separators=(",", ":"),
+                    )
+                )
                 await events.put({"type": "result", "data": response})
             except QueueFullError:
+                log_outcome("rejected", "queue_full")
                 await events.put({"type": "error", "data": {"reason": "queue_full"}})
             except UsageBudgetExceededError:
+                log_outcome("failed", "usage_budget_exhausted")
                 await events.put(
                     {"type": "error", "data": {"reason": "usage_budget_exhausted"}}
                 )
             except TimeoutError:
+                log_outcome("failed", "agent_timeout")
                 await events.put({"type": "error", "data": {"reason": "agent_timeout"}})
             except ClientError as exc:
                 reason = classify_provider_error(exc)
+                log_outcome("failed", reason)
                 await events.put({"type": "error", "data": {"reason": reason}})
             except BotoCoreError:
+                log_outcome("failed", "provider_unavailable")
                 await events.put(
                     {"type": "error", "data": {"reason": "provider_unavailable"}}
                 )
             except ValueError as exc:
+                log_outcome("failed", "invalid_request")
                 await events.put(
                     {
                         "type": "error",
@@ -281,6 +351,7 @@ def create_app(
                     }
                 )
             except Exception:  # noqa: BLE001 - provider details stay out of user-facing stream
+                log_outcome("failed", "agent_failure")
                 await events.put({"type": "error", "data": {"reason": "agent_failure"}})
             finally:
                 await events.put(None)

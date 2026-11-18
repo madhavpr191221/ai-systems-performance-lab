@@ -1,0 +1,12 @@
+.git
+.venv
+**/__pycache__
+**/*.py[cod]
+.env
+.env.*
+!.env.example
+ui/node_modules
+ui/dist
+results
+.pytest_cache
+.ruff_cache

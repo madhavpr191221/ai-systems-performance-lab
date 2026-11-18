@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ECR repository for the temporary AI Systems Performance Lab agent task.
+
+Resources:
+  AgentRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RepositoryName: ai-systems-performance-lab-agent
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"Keep only the newest image","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":2},"action":{"type":"expire"}}]}
+      Tags:
+        - Key: Project
+          Value: ai-systems-performance-lab
+        - Key: Purpose
+          Value: temporary-agent-performance-study
+
+Outputs:
+  RepositoryUri:
+    Value: !GetAtt AgentRepository.RepositoryUri
+  RepositoryName:
+    Value: !Ref AgentRepository

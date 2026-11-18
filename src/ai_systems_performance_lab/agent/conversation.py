@@ -45,6 +45,8 @@ class TurnState:
     events: list[ToolEvent] = field(default_factory=list)
     tool_calls: int = 0
     model_calls: int = 0
+    input_tokens: int | None = None
+    output_tokens: int | None = None
 
 
 class BedrockConversationAgent:
@@ -258,9 +260,14 @@ class BedrockConversationAgent:
                     progress({"type": "memory_unavailable", "operation": "write"})
         state.events.append(ToolEvent("bedrock_agent_turn", started, perf_counter(), 0))
         usage = getattr(getattr(result, "metrics", None), "accumulated_usage", {})
-        if progress and isinstance(usage, dict):
+        if isinstance(usage, dict):
             in_tokens = usage.get("inputTokens") or usage.get("input_tokens")
             out_tokens = usage.get("outputTokens") or usage.get("output_tokens")
+            state.input_tokens = int(in_tokens) if in_tokens is not None else None
+            state.output_tokens = int(out_tokens) if out_tokens is not None else None
+        if progress and isinstance(usage, dict):
+            in_tokens = state.input_tokens
+            out_tokens = state.output_tokens
             if in_tokens is not None or out_tokens is not None:
                 progress(
                     {
@@ -278,6 +285,8 @@ class BedrockConversationAgent:
             execution_source=f"strands_bedrock:{self.model_id}",
             model_calls=state.model_calls,
             tool_calls=state.tool_calls,
+            input_tokens=state.input_tokens,
+            output_tokens=state.output_tokens,
         )
 
 

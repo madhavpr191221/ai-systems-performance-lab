@@ -1,0 +1,269 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: One temporary, IP-restricted Fargate task for real Bedrock agent workload studies.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  PublicSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Existing public subnet with a route to an Internet Gateway.
+  AllowedClientCidr:
+    Type: String
+    Description: Your current public IPv4 address in CIDR form, normally x.x.x.x/32.
+    AllowedPattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}/(3[0-2]|[12]?[0-9])$"
+  ImageUri:
+    Type: String
+    Description: Immutable image URI pushed to the project ECR repository.
+  EcrRepositoryArn:
+    Type: String
+    Description: ARN of the project ECR repository used by the task execution role.
+  CasesTableArn:
+    Type: String
+  DemoBucketName:
+    Type: String
+  BedrockModelId:
+    Type: String
+    Default: us.amazon.nova-2-lite-v1:0
+  BedrockInvokeResourceArns:
+    Type: CommaDelimitedList
+    Description: Exact inference-profile and underlying model ARNs required by the selected profile.
+  Concurrency:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 8
+  QueueCapacity:
+    Type: Number
+    Default: 4
+    MinValue: 0
+    MaxValue: 64
+  MaxAgentRequests:
+    Type: Number
+    Default: 200
+    MinValue: 1
+    MaxValue: 200
+  LogRetentionDays:
+    Type: Number
+    Default: 7
+    AllowedValues: [1, 3, 5, 7, 14]
+
+Resources:
+  AgentLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: /ai-systems-performance-lab/agent
+      RetentionInDays: !Ref LogRetentionDays
+
+  AgentSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Temporary access to the performance lab agent from one client IP.
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: !Ref AllowedClientCidr
+          Description: Temporary local UI and load-generator access.
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS access to ECR, Bedrock, S3, DynamoDB, and AWS APIs.
+      Tags:
+        - Key: Project
+          Value: ai-systems-performance-lab
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:*
+      Policies:
+        - PolicyName: PullProjectImageAndWriteProjectLogs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                Resource: !Ref EcrRepositoryArn
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ai-systems-performance-lab/agent:*
+      Tags:
+        - Key: Project
+          Value: ai-systems-performance-lab
+
+  AgentTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:*
+      Policies:
+        - PolicyName: SyntheticAgentDataAndBedrock
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: dynamodb:GetItem
+                Resource: !Ref CasesTableArn
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub arn:${AWS::Partition}:s3:::${DemoBucketName}
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - agent-sessions/*
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${DemoBucketName}/cases/*
+                  - !Sub arn:${AWS::Partition}:s3:::${DemoBucketName}/policies/synthetic-review-v1.txt
+                  - !Sub arn:${AWS::Partition}:s3:::${DemoBucketName}/agent-sessions/*
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${DemoBucketName}/agent-sessions/*
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource: !Ref BedrockInvokeResourceArns
+      Tags:
+        - Key: Project
+          Value: ai-systems-performance-lab
+
+  AgentCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: ai-systems-performance-lab
+      Tags:
+        - Key: Project
+          Value: ai-systems-performance-lab
+
+  AgentTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: ai-systems-performance-lab-agent
+      Cpu: "512"
+      Memory: "1024"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt AgentTaskRole.Arn
+      ContainerDefinitions:
+        - Name: agent-api
+          Image: !Ref ImageUri
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8000
+              Protocol: tcp
+          Environment:
+            - Name: AGENT_BACKEND
+              Value: bedrock
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+            - Name: BEDROCK_MODEL_ID
+              Value: !Ref BedrockModelId
+            - Name: DYNAMODB_CASES_TABLE
+              Value: !Select [1, !Split ["/", !Ref CasesTableArn]]
+            - Name: AWS_DATA_BUCKET
+              Value: !Ref DemoBucketName
+            - Name: AGENT_SESSION_S3_BUCKET
+              Value: !Ref DemoBucketName
+            - Name: AGENT_MAX_REQUESTS_PER_PROCESS
+              Value: !Ref MaxAgentRequests
+            - Name: AGENT_MAX_MODEL_TURNS
+              Value: "3"
+            - Name: AGENT_MAX_TOOL_CALLS
+              Value: "6"
+            - Name: AGENT_MAX_OUTPUT_TOKENS
+              Value: "400"
+            - Name: BEDROCK_MAX_TOKENS
+              Value: "512"
+            - Name: LAB_CONCURRENCY
+              Value: !Ref Concurrency
+            - Name: LAB_QUEUE_CAPACITY
+              Value: !Ref QueueCapacity
+            - Name: SYNTHETIC_CASE_COUNT
+              Value: "1000"
+            - Name: SYNTHETIC_SEED
+              Value: "20261117"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref AgentLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: task
+              mode: non-blocking
+              max-buffer-size: 4m
+      Tags:
+        - Key: Project
+          Value: ai-systems-performance-lab
+
+  AgentService:
+    Type: AWS::ECS::Service
+    DependsOn: AgentLogGroup
+    Properties:
+      ServiceName: ai-systems-performance-lab-agent
+      Cluster: !Ref AgentCluster
+      TaskDefinition: !Ref AgentTaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 0
+        MaximumPercent: 100
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups: [!Ref AgentSecurityGroup]
+          Subnets: [!Ref PublicSubnetId]
+      EnableECSManagedTags: true
+      Tags:
+        - Key: Project
+          Value: ai-systems-performance-lab
+
+Outputs:
+  ClusterName:
+    Value: !Ref AgentCluster
+  ServiceName:
+    Value: ai-systems-performance-lab-agent
+  SecurityGroupId:
+    Value: !Ref AgentSecurityGroup
+  LogGroupName:
+    Value: !Ref AgentLogGroup
+  TaskDefinitionArn:
+    Value: !Ref AgentTaskDefinition

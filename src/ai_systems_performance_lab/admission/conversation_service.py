@@ -130,6 +130,8 @@ class BoundedConversationService:
                     "execution_source": result.execution_source,
                     "model_calls": result.model_calls,
                     "tool_calls": result.tool_calls,
+                    "input_tokens": result.input_tokens,
+                    "output_tokens": result.output_tokens,
                     "tool_events": [
                         {
                             "name": event.name,

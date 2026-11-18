@@ -10,7 +10,7 @@ does not make credit decisions; its research focus is AI system behavior.
 ## Current state
 
 The local UI supports multi-turn chat, a streamed activity panel, and a bounded
-per-process conversation service. Fixture mode makes no model or AWS calls.
+per-process conversation service. Simulated mode makes no model or AWS calls.
 The AWS data layer has been provisioned and seeded with 1,002 synthetic cases
 in DynamoDB and 1,003 S3 objects. Bucket privacy/encryption and the table's
 on-demand mode were verified. A bounded Bedrock request later completed with
@@ -22,7 +22,14 @@ The UI's case picker contains the two hand-written examples plus a reproducible
 set of 1,000 generated examples. Generated inputs are test data, not a model
 quality claim. The stochastic performance experiments begin after the live
 agent interaction has passed its acceptance gate. The separate `/review`
-endpoint remains a deterministic workload fixture for later load tests.
+endpoint remains a deterministic simulated workload for later load tests.
+
+The first agent workload experiment is implemented on a separate experiment
+branch. It uses HTTP open-loop arrivals against the local simulated agent to
+compare arrival variability, finite queue sizes, and concurrency. It forces the
+simulated backend and makes no AWS or Bedrock calls. See
+[the experiment protocol](docs/experiments/local_open_loop.md) for methodology,
+run commands, artifact definitions, and limitations.
 
 ## Run the local interactive demo
 
@@ -39,8 +46,9 @@ the checked-in UI lockfile and runs `npm ci` automatically only if UI packages
 are missing. `VITE_API_URL` is set in `.env` so the UI reaches the API.
 
 Edit `.env` to change host/port values. The launcher reports occupied ports
-without terminating unrelated processes. Use `AGENT_BACKEND=fixture` in `.env`
-for a local demo that makes no cloud calls.
+without terminating unrelated processes. `AGENT_BACKEND=simulated` in `.env`
+selects a local demo that makes no cloud calls. The older value `fixture` is
+still accepted for compatibility.
 
 ## Use the Bedrock agent
 
@@ -112,6 +120,6 @@ uv run --env-file .env lab
 The combined command is the local run path; the launcher manages Node/Vite, so
 you do not need to run npm manually.
 
-Fixture tests and recorded results are the repeatable/high-volume path. Real
+Simulated runs and recorded results are the repeatable/high-volume path. Real
 Bedrock requests remain small, cost-bounded integration checks and must never
 be used as uncontrolled load generation.

@@ -116,7 +116,7 @@ async def test_api_returns_multi_tool_result_and_local_metric_scope() -> None:
     assert len(body["tool_events"]) == 5
     assert body["model_calls"] == 0
     assert body["tool_calls"] == 5
-    assert body["execution_source"] == "synthetic_fixture"
+    assert body["execution_source"] == "simulated_synthetic_workflow"
     assert body["timing_ms"]["end_to_end"] >= body["timing_ms"]["processing"]
     assert metrics["scope"] == "process_local"
     assert metrics["admitted"] == metrics["completed"] == 1
@@ -147,7 +147,7 @@ async def test_review_stream_emits_live_tool_activity_and_result() -> None:
     assert '"type":"tool_started"' in response.text
     assert '"name":"calculate_dscr"' in response.text
     assert '"type":"result"' in response.text
-    assert "deterministic fixture response" in response.text
+    assert "deterministic simulated response" in response.text
 
 
 @pytest.mark.asyncio

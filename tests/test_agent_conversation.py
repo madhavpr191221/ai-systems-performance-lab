@@ -106,7 +106,7 @@ def test_s3_evidence_reader_returns_ranked_citations_and_closes_body() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fixture_chat_stream_supports_follow_up_turns_and_case_bound_session() -> (
+async def test_simulated_chat_stream_supports_follow_up_turns_and_case_bound_session() -> (
     None
 ):
     app = create_app(concurrency=1, queue_capacity=1, tool_delay_ms=0)
@@ -132,7 +132,7 @@ async def test_fixture_chat_stream_supports_follow_up_turns_and_case_bound_sessi
 
     assert first.status_code == second.status_code == 200
     assert '"type":"tool_started"' in first.text
-    assert '"execution_source":"fixture_no_llm"' in first.text
+    assert '"execution_source":"simulated_agent_no_llm"' in first.text
     assert '"model_calls":0' in first.text
     assert "Calculate the ratio" in first.text
     assert metrics["offered"] == metrics["completed"] == 2
@@ -177,7 +177,7 @@ async def test_strands_agent_selects_tools_and_reuses_s3_session(monkeypatch) ->
 
             callbacks[BeforeModelCallEvent](BeforeModelCallEvent(agent=self))
             # Deliberately call only one tool. The agent is not forced through
-            # the full fixture sequence.
+            # the full simulated sequence.
             await selected_tools[1]()
             callbacks[AfterModelCallEvent](AfterModelCallEvent(agent=self))
             yield {"result": FakeResult()}

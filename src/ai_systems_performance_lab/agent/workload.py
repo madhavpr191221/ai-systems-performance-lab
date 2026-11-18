@@ -70,15 +70,15 @@ class ReviewResult:
     evidence: tuple[str, ...]
     tool_events: tuple[ToolEvent, ...]
     summary: str | None = None
-    execution_source: str = "synthetic_fixture"
+    execution_source: str = "simulated_synthetic_workflow"
     model_calls: int = 0
     tool_calls: int = 0
 
 
 def load_demo_cases() -> dict[str, CreditCase]:
-    """Load the same synthetic case fixtures used by the AWS seed utility."""
-    fixture_path = Path(__file__).resolve().parents[3] / "fixtures" / "cases.json"
-    records = json.loads(fixture_path.read_text(encoding="utf-8"))
+    """Load the same synthetic example cases used by the AWS seed utility."""
+    cases_path = Path(__file__).resolve().parents[3] / "fixtures" / "cases.json"
+    records = json.loads(cases_path.read_text(encoding="utf-8"))
     return {record["case_id"]: CreditCase(**record) for record in records}
 
 
@@ -100,7 +100,7 @@ def load_agent_cases(
 class SyntheticCreditReviewAgent:
     """Scripted agent workload: retrieve, calculate, stress, and apply policy.
 
-    Delays are explicit fixture parameters. No model is called and no real credit
+    Delays are explicit simulation parameters. No model is called and no real credit
     decision is produced; the workflow exists to generate correlated, inspectable
     tool work for systems experiments.
     """
@@ -157,12 +157,12 @@ class SyntheticCreditReviewAgent:
             progress=progress,
         )
         # The mock model stage makes the workload shape explicit without claiming
-        # that fixture output came from an LLM.
+        # that simulated output came from an LLM.
         await self._call(
             "mock_model_summary",
             self.model_delay_s,
             events,
-            lambda: f"Fixture summary for {case.case_id}: {recommendation}",
+            lambda: f"Simulated summary for {case.case_id}: {recommendation}",
             progress=progress,
         )
         return ReviewResult(
@@ -179,10 +179,10 @@ class SyntheticCreditReviewAgent:
             tool_events=tuple(events),
             summary=(
                 f"{case.question} Findings: DSCR {dscr:.2f}, stressed DSCR {stressed_dscr:.2f}; "
-                f"synthetic outcome: {recommendation}. This is a deterministic fixture response, "
+                f"synthetic outcome: {recommendation}. This is a deterministic simulated response, "
                 "not a language-model answer or credit decision."
             ),
-            execution_source="synthetic_fixture",
+            execution_source="simulated_synthetic_workflow",
             model_calls=0,
             tool_calls=len(events),
         )
@@ -215,14 +215,20 @@ class SyntheticCreditReviewAgent:
         return result
 
 
-class FixtureConversationAgent:
-    """No-LLM conversational interface over deterministic synthetic fixtures."""
+class SimulatedConversationAgent:
+    """No-LLM conversational interface over a controlled synthetic workflow."""
 
     def __init__(
-        self, cases: dict[str, CreditCase], *, tool_delay_ms: float = 5.0
+        self,
+        cases: dict[str, CreditCase],
+        *,
+        tool_delay_ms: float = 5.0,
+        model_delay_ms: float = 30.0,
     ) -> None:
         self.cases = cases
-        self.review_agent = SyntheticCreditReviewAgent(tool_delay_ms=tool_delay_ms)
+        self.review_agent = SyntheticCreditReviewAgent(
+            tool_delay_ms=tool_delay_ms, model_delay_ms=model_delay_ms
+        )
 
     async def run(
         self,
@@ -240,12 +246,12 @@ class FixtureConversationAgent:
             case_id=turn.case_id,
             conversation_id=turn.conversation_id,
             answer=(
-                f"Fixture response to: {turn.question}\n\n{review.summary}\n\n"
+                f"Simulated response to: {turn.question}\n\n{review.summary}\n\n"
                 "This deterministic demonstration did not call a language model."
             ),
             evidence=review.evidence,
             tool_events=review.tool_events,
-            execution_source="fixture_no_llm",
+            execution_source="simulated_agent_no_llm",
             model_calls=0,
             tool_calls=review.tool_calls,
         )

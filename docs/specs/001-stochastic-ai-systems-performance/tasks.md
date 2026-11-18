@@ -4,7 +4,7 @@
 
 - [x] Keep synthetic commercial-credit analysis as the workload, not project subject.
 - [x] Keep service metrics outside the agent's decision loop.
-- [x] Preserve the deterministic `/review` workload fixture.
+- [x] Preserve the deterministic simulated `/review` workload.
 - [x] Add a multi-turn chat UI and case-bound session/turn API.
 - [x] Add Strands model-selected bounded tools for Bedrock mode.
 - [x] Add exact-key DynamoDB case reads and bounded S3 evidence/policy reads.
@@ -23,12 +23,14 @@
 - [ ] Bedrock chat works through the UI with a model-selected tool path.
 - [ ] Same-case follow-up session persists; optional AgentCore Memory is supplemental and isolated.
 - [ ] Evidence citations and deterministic calculations can be verified against source records.
-- [ ] Error paths and service timing are visible; fixture fallback works offline.
+- [ ] Error paths and service timing are visible; simulated-agent mode works offline.
 - [ ] Live integration evidence is labeled accurately, with actual spend recorded.
 
 ## Stochastic work begins after the gate
 
-- [ ] Specify Experiment 1 workload, deadline, SLO, observation window, and hypothesis.
-- [ ] Compare deterministic and Poisson arrivals at matched mean rate.
-- [ ] Compare variable agent service paths and finite queue/concurrency choices.
-- [ ] Verify sample-path conservation and report rejection, failure, unfinished work, and latency populations separately.
+- [x] Specify the first local workload study, hypotheses, 500 ms diagnostic deadline, observation window, and reproducible run settings. (This is not a production SLO.)
+- [x] Compare deterministic and Poisson arrivals at matched nominal mean rates.
+- [x] Compare finite queue sizes and application concurrency using the simulated agent.
+- [x] Verify sample-path conservation and report rejection, failure, unfinished work, and latency populations separately.
+- [ ] Compare empirically calibrated variable inference/service-time distributions; the current simulated workload matrix is an initial controlled study.
+- [ ] Repeat the study with a small, explicitly budgeted real-Bedrock sample; do not use Bedrock for load generation.

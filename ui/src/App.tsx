@@ -3,7 +3,7 @@ import Markdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
 
-type Backend = "fixture" | "bedrock" | "offline";
+type Backend = "simulated" | "bedrock" | "offline";
 type Metrics = {
   offered: number;
   admitted: number;
@@ -90,7 +90,7 @@ export default function App() {
       ]);
       if (!healthResponse.ok || !metricsResponse.ok || !casesResponse.ok) throw new Error("API is not ready");
       const health = await healthResponse.json();
-      setBackend(health.inference === "bedrock" ? "bedrock" : "fixture");
+      setBackend(health.inference === "bedrock" ? "bedrock" : "simulated");
       setMetrics(await metricsResponse.json());
       const availableCases = (await casesResponse.json()) as DemoCase[];
       setCases(availableCases);
@@ -244,7 +244,7 @@ export default function App() {
     }
   }
 
-  const backendLabel = backend === "bedrock" ? "Bedrock · configured" : backend === "fixture" ? "Fixture · no LLM" : "API offline";
+  const backendLabel = backend === "bedrock" ? "Bedrock · configured" : backend === "simulated" ? "Simulated agent · no LLM" : "API offline";
 
   return (
     <main className="app-shell">
@@ -267,7 +267,7 @@ export default function App() {
         <section className="conversation-panel" aria-label="Agent conversation">
           <div className="conversation-heading">
             <div><div className="eyebrow">SYNTHETIC CASE WORKFLOW</div><h1>Ask the review agent</h1></div>
-            <span className="status-chip"><i /> {backend === "bedrock" ? "BEDROCK MODE" : backend === "fixture" ? "READY TO RUN" : "WAITING FOR API"}</span>
+            <span className="status-chip"><i /> {backend === "bedrock" ? "BEDROCK MODE" : backend === "simulated" ? "SIMULATED MODE" : "WAITING FOR API"}</span>
           </div>
 
           <div className="chat-scroll">
@@ -293,7 +293,7 @@ export default function App() {
             <textarea id="question" value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={1200} rows={2} disabled={busy || backend === "offline" || startingSession} />
             <div className="composer-bottom"><span>{startingSession ? "Starting case session…" : "Ask a follow-up in the same conversation"}</span><button className="send-button" type="submit" disabled={busy || backend === "offline" || startingSession || !question.trim()}>{busy ? <><span className="button-spinner" /> Working</> : <>Run agent <span>↑</span></>}</button></div>
           </form>
-          <div className="privacy-line">Synthetic values only · Agent output is advisory · Fixture mode makes no model calls</div>
+          <div className="privacy-line">Synthetic values only · Agent output is advisory · Simulated mode makes no model calls</div>
         </section>
 
         <aside className="right-rail">
@@ -318,7 +318,7 @@ export default function App() {
             <div className="scope-caption">PROCESS-LOCAL · COMPLETED TURNS</div>
           </section>
 
-          <div className="mode-note"><strong>{backend === "bedrock" ? "Live model path" : "Safe demo path"}</strong><p>{backend === "bedrock" ? "Bedrock calls may incur token charges. AWS tools are read-only." : backend === "fixture" ? "Fixture mode shows a deterministic workflow without calling an LLM or AWS." : "Start the FastAPI server, then refresh."}</p></div>
+          <div className="mode-note"><strong>{backend === "bedrock" ? "Live model path" : "Safe demo path"}</strong><p>{backend === "bedrock" ? "Bedrock calls may incur token charges. AWS tools are read-only." : backend === "simulated" ? "The simulated agent follows a controlled workflow without calling an LLM or AWS." : "Start the FastAPI server, then refresh."}</p></div>
         </aside>
       </section>
     </main>
@@ -326,7 +326,7 @@ export default function App() {
 }
 
 function ResultCard({ result }: { result: AgentResult }) {
-  return <div className="result-card"><div className="result-badges"><span className="result-label">AGENT RESPONSE</span><span className="outcome-badge">{result.execution_source.includes("bedrock") ? "BEDROCK" : "FIXTURE"}</span></div><details><summary>Evidence, tools, and execution details</summary><p className="source-label">{result.execution_source} · {result.model_calls} model calls · {result.tool_calls} tool calls</p><ul>{result.evidence.map((item) => <li key={item}>{item}</li>)}</ul><div className="tool-summary">{result.tool_events.map((event, index) => <span key={`${event.name}-${index}`}>{event.name} <b>{event.duration_ms.toFixed(1)} ms</b></span>)}</div><div className="timing-breakdown"><span>Queue {result.timing_ms.queue_wait.toFixed(1)} ms</span><span>Processing {result.timing_ms.processing.toFixed(1)} ms</span><span>End to end {result.timing_ms.end_to_end.toFixed(1)} ms</span></div></details></div>;
+  return <div className="result-card"><div className="result-badges"><span className="result-label">AGENT RESPONSE</span><span className="outcome-badge">{result.execution_source.includes("bedrock") ? "BEDROCK" : "SIMULATED"}</span></div><details><summary>Evidence, tools, and execution details</summary><p className="source-label">{result.execution_source} · {result.model_calls} model calls · {result.tool_calls} tool calls</p><ul>{result.evidence.map((item) => <li key={item}>{item}</li>)}</ul><div className="tool-summary">{result.tool_events.map((event, index) => <span key={`${event.name}-${index}`}>{event.name} <b>{event.duration_ms.toFixed(1)} ms</b></span>)}</div><div className="timing-breakdown"><span>Queue {result.timing_ms.queue_wait.toFixed(1)} ms</span><span>Processing {result.timing_ms.processing.toFixed(1)} ms</span><span>End to end {result.timing_ms.end_to_end.toFixed(1)} ms</span></div></details></div>;
 }
 
 function Metric({ label, value, warning = false }: { label: string; value: number; warning?: boolean }) {

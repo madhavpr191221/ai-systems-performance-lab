@@ -31,7 +31,7 @@ least-privilege roles and never allow model-selected table names or S3 keys.
 
 Exercise missing cases, unavailable evidence/policy, provider throttling,
 timeouts, memory degradation, and exhausted budgets. Show failed stages and
-partial answers honestly. Keep the fixture path and browser transcript fallback
+partial answers honestly. Keep the simulated-agent path and browser transcript fallback
 so the demo remains usable without AWS connectivity.
 
 ### Iteration 5 — Fargate package and controlled smoke path
@@ -55,7 +55,7 @@ Stochastic analysis starts after all of the following are true:
 5. The UI streams tool activity without exposing hidden reasoning.
 6. Mocked tests cover source failures, case isolation, and tool/model budgets;
    a small authorized live check is separately cost-estimated and labeled.
-7. The fixture path works offline and the container builds without credentials.
+7. The simulated-agent path works offline and the container builds without credentials.
 
 ## Stochastic analysis after the gate
 

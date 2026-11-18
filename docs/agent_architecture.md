@@ -25,17 +25,17 @@ flowchart TB
         API[FastAPI application]
         WAIT[Request waiting line<br/>up to 4 waiting, 2 active by default]
         AGENT[Strands agent controller]
-        FIXTURE[Offline fixture agent<br/>no model call]
+        SIM[Simulated agent<br/>no model call]
         STREAM[FastAPI answer and activity stream]
         METRICS[Request and tool timings]
         BROWSER --> UI
         UI -->|HTTP on localhost: question and case| API
         API --> WAIT
         WAIT -->|Bedrock mode| AGENT
-        WAIT -->|fixture mode| FIXTURE
+        WAIT -->|simulated mode| SIM
         API --> METRICS
         AGENT --> STREAM
-        FIXTURE --> STREAM
+        SIM --> STREAM
         STREAM -->|answer and visible activity| UI
         METRICS -->|refresh metrics| UI
     end
@@ -63,7 +63,7 @@ flowchart TB
 This is the current interview-demo arrangement: the UI and API run locally;
 the API uses the AWS SDK credential chain to call AWS services. The waiting line
 and metrics live inside that one API process, so multiple copies would each
-have their own limits and measurements. In fixture mode, no model is called.
+have their own limits and measurements. In simulated mode, no model is called.
 When hosted later, the API can move into an ECS Fargate task; that deployment
 is not yet provisioned. CloudWatch applies to that hosted task. The hosted
 network path (for example, private ECS tasks and authenticated ingress) is a
@@ -72,7 +72,7 @@ later design; it is not drawn as if it already exists.
 ### Model and tool interaction
 
 **The model is configurable and has not been selected for a live run yet.**
-The local default is a scripted fixture, not an LLM. Bedrock mode requires
+The local default is a scripted simulation, not an LLM. Bedrock mode requires
 `BEDROCK_MODEL_ID`. Amazon Nova 2 Lite is the candidate for the first low-volume
 tool-use trial; its [model card lists client-side tool calling and response
 streaming](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-2-lite.html).
@@ -164,7 +164,7 @@ overwrite source facts or tool results.
   are not a hard dollar cap. ECS task count, Bedrock quotas, and each process's
   request limits are separate controls.
 
-The separate `/review` API remains a deterministic workload fixture. It is
+The separate `/review` API remains a deterministic simulated workload. It is
 available for controlled, high-volume local tests; it must not be described as
 a live model result.
 
@@ -219,11 +219,11 @@ policy before a persistent public deployment.
 
 | Mode | Agent/model | State/tools | Result label |
 | --- | --- | --- | --- |
-| `fixture` (default) | Scripted no-LLM response | Seeded in-memory cases; deterministic delays | `fixture_no_llm` |
+| `simulated` (default; legacy `fixture` accepted) | Scripted no-LLM response | Seeded in-memory cases; deterministic delays | `simulated_agent_no_llm` |
 | `bedrock` | Strands model-driven loop on Bedrock | DynamoDB, S3, S3 session history, optional AgentCore Memory | `strands_bedrock:<model-id>` |
 
-Fixtures are the standard load-test path. Do not use uncontrolled real Bedrock
-calls as a load generator. Preserve source labels for fixture, recorded, local
+The simulated agent is the standard load-test path. Do not use uncontrolled real Bedrock
+calls as a load generator. Preserve source labels for simulated, recorded, local
 live AWS, and deployed AWS evidence.
 
 ## AWS target and cost boundary
